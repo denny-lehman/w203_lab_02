@@ -1,0 +1,336 @@
+---
+title: "Lab 2: Exploratory Data Analysis and Causal Model Bulding"
+author: 'Team 2: Savita Chari, Denny Lehman, Tymon Silva'
+date: "December 7, 2021"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load packages, message = FALSE}
+library(tidyverse)
+ 
+library(lmtest)
+library(sandwich)
+library(stargazer)
+library(magrittr)
+library(sandwich)
+library(gridExtra)
+library(funModeling)
+library(cowplot)
+library(MASS)
+library(ggplot2)
+```
+# Data
+
+```{r load data, echo = TRUE, message=FALSE, warning=FALSE}
+eda_data <- read_csv(file = '../src/data/forestfires.csv')
+```
+
+
+```{r EDA: Glimpse into the data by describing it, echo = TRUE}
+describe(eda_data)
+```
+
+```{r EDA: Glimpse into the histograms for numerical variables of interest, echo = FALSE, message=FALSE, warning=FALSE, show_col_types = FALSE }
+# EDA: Glimpse into the histograms for numerical variables of interest
+p2 <- plot_num(eda_data[5:13])
+
+
+```
+
+# Analysis of Outcome Variable : area
+
+Area is very important for our study because it is our outcome variable. We want to find out what factors cause area to burn in forest fires.
+From the graph above, area seems to have a heavy left tail. We should use log transformation on area field to see if the IID improves.
+
+```{r EDA: Observations with area = 0,  echo = FALSE, message=FALSE, warning=FALSE, show_col_types = FALSE }
+cat ("Total observations in the dataset: ", nrow(eda_data))
+cat("\nNumber of Observations where area is zero:" ,nrow(subset(eda_data,area == 0)))
+```
+```{r EDA: Plot the histogram of the Distribution of Burnt Area,  echo = FALSE, message=FALSE, warning=FALSE, show_col_types = FALSE }
+# Histogram of Non Log Transformed area
+hist_of_area_dist <- eda_data %>% 
+ggplot() + aes(x = area) +
+geom_histogram( bins=20, fill="cornsilk", color="black", alpha=0.9) +
+labs(
+x = "Area in hectare ", y="Occurrence",
+title = '               Burnt area Distribution \n \nNon-Log Transformed',
+caption = "Figure 1"
+)
+
+
+# Perform Log transformation
+eda_data$logarea <- log(eda_data$area + 1)
+
+# Histogram of Log Transformed area
+hist_of_logarea_dist <- eda_data %>% 
+ggplot() + aes(x = logarea) +
+geom_histogram( bins=20, fill="cornsilk", color="black", alpha=0.9) +
+labs(
+x = "Area in hectare ", y="Occurrence",
+title = '\n\nLog Transformed ',
+caption = "Figure 2"
+)
+
+# Plot both the histograms
+plot_grid(hist_of_area_dist,hist_of_logarea_dist)
+
+```
+
+# Observation:
+The graphs above has a very heavy left tail and log transformation did not fix it. As observed earlier,  a lot of observations have area = 0. Which essentially means that these observations did not cause any measurable area to burn. For our analysis such rows are not important. Nearly 48% of the rows have zero value in area field. So  we should remove these rows and see if that improves the distribution.
+
+
+
+```{r Perform log transformation on area field. Pick only the observations with some data in the area column}
+eda_sub_data <- eda_data %>%  filter(area > 0)
+
+#view(eda_sub_data)
+```
+
+
+```{r EDA: Observations with area = 0,  echo = FALSE, message=FALSE, warning=FALSE, show_col_types = FALSE }
+cat ("Total observations in the dataset: ", nrow(eda_sub_data))
+cat("\nNumber of Observations where area is zero:" ,nrow(subset(eda_sub_data,area == 0)))
+```
+# Repeat the analysis done abve on the sub set of data where the area (of burn) has a value > 0
+
+```{r Describe the sub set of data}
+summary(eda_sub_data)
+
+```
+
+```{r,  echo = FALSE, message=FALSE, warning=FALSE, show_col_types = FALSE}
+plot_num(eda_sub_data[5:13])
+
+```
+
+
+```{r EDA: Plot the histogram of the Distribution of Burnt Area,  echo = FALSE, message=FALSE, warning=FALSE, show_col_types = FALSE }
+
+set.seed(1234)
+hist_of_area_dist <- eda_sub_data %>% 
+ggplot() + aes(x = area) +
+geom_histogram( bins=20, fill="cornsilk", color="black", alpha=0.9) + 
+labs(
+x = "Area in hectare ", y="Occurrence",
+title = 'Values > 0 Burnt area Distribution',
+subtitle = 'Non-Log Transformed',
+caption = "Figure 3"
+) 
+
+#hist_of_area_dist
+
+# Perform Log transformation
+eda_sub_data$logarea <- log(eda_sub_data$area)
+
+
+hist_of_logarea_dist <- eda_sub_data %>% 
+ggplot() + aes(x = logarea) +
+geom_histogram( bins=20, fill="cornsilk", color="black", alpha=0.9) + 
+  
+  geom_vline(aes(xintercept = mean(logarea)), color = "#000000", size = 1.25) +
+  geom_vline(aes(xintercept = mean(logarea) + sd(logarea)), color = "#000000", size = 1, linetype = "dashed") +
+  geom_vline(aes(xintercept = mean(logarea) - sd(logarea)), color = "#000000", size = 1, linetype = "dashed")+
+labs(
+x = "Area in hectare ", y="Occurrence",
+subtitle = '\n\nLog Transformed (with intercept)',
+caption = "Figure 4"
+)
+
+    
+plot_grid(hist_of_area_dist,hist_of_logarea_dist)
+
+```
+# Observation: Area is our outcome variable. After performing the log tansformation and filtering out the zero values of the area, the distribution of our outcome variable 'area' looks normal (Figure 4)
+
+
+#  Analysing of Predictors Variables
+
+In our causal diagram we have identified three predictor variables 
+1. rain - outside rain in mm/m2 : 0.0 to 6.4
+2. wind - wind speed in km/h: 0.40 to 9.40
+3. FFMC - FFMC index from the FWI system: 18.7 to 96.20
+
+
+# Analysis of rain
+
+```{r EDA: Histogram to see if rain has normal distribution,  echo = FALSE, message=FALSE, warning=FALSE, show_col_types = FALSE}
+hist_of_rain_dist <- eda_sub_data %>% 
+ggplot() + aes(x = rain ) +
+geom_histogram( bins=20, fill="#B0DEEA", color="black", alpha=0.9) +
+labs(
+x = "rainfall in mm/m2", y="Occurrence",
+title = 'Distribution graphs',
+subtitle = 'rain occurrence'
+)
+
+# Log trnsformation on rain
+
+hist_of_lograin_dist <- eda_sub_data %>% 
+ggplot() + aes(x = log(rain) ) +
+geom_histogram( bins=20, fill="#B0DEEA", color="black", alpha=0.9) +
+labs(
+x = "rainfall in mm/m2", y="Occurrence",
+title = 'Log Transformed rain',
+subtitle = 'rain occurrence',
+
+)
+plot_grid(hist_of_rain_dist,hist_of_lograin_dist)
+
+```
+# Observation - rain
+The above histograms shows thhat rain did not benifit from log transformation
+Let's draw a box plot to observe how does the data look!
+
+```{r EDA: Box plotting predictors vs log transformed outcome variable , echo = FALSE, message=FALSE, warning=FALSE}
+#  Box plots is a great way to quickly examin our predictor variables
+a <- ggplot(eda_sub_data, aes(x = wind, y = logarea)) +
+  geom_boxplot() +
+  geom_smooth() +
+  ggtitle("wind vs log(area)")
+
+b <- ggplot(eda_sub_data, aes(x = rain, y = logarea)) +
+  geom_boxplot() +
+  geom_smooth() +
+  ggtitle("rain vs log(area)")
+
+c <- ggplot(eda_sub_data, aes(x = FFMC, y = logarea)) +
+  geom_boxplot() +
+  geom_smooth() +
+  ggtitle("FFMC vs log(area)")
+
+
+
+grid.arrange(a, b, c, nrow = 2)
+```
+# Observation: rain (continued)
+Most of the observations do not have any data for rain.
+All of the very sparce existing rain data is outlier, this is the reason log transformation did not make any difference to rain.
+In this state, rain will not help in answering our causal question
+# Further Transformation on rain
+We will convert rain to a binary (True/False) field 
+
+```{r Transform rain field to a binary field.}
+# For all the observation that has some value in rain column, the rain_binary will be True, else it will be False
+eda_sub_data <- eda_sub_data %>%
+  mutate(
+    rain_binary = case_when(
+      rain > 0 ~ 1,
+      rain == 0 ~ 0,
+      )
+  )
+
+```
+
+# Observation: wind and FFMC 
+
+```{r EDA: Check the distribution of column wind }
+hist_of_wind_dist <- eda_sub_data %>% 
+ggplot() + aes(x = wind ) +
+geom_histogram( bins=20, fill="#C8E6C9", color="black", alpha=0.9) +
+labs(
+x = "wind speed in km/h", y="Occurrence",
+title = 'Distribution graphs',
+subtitle = 'Wind occurrence'
+)
+
+hist_of_FFMC_dist <- eda_sub_data %>% 
+ggplot() + aes(x = log(FFMC) ) +
+geom_histogram( bins=20, fill="#FFCCBC", color="black", alpha=0.9) +
+labs(
+x = "FFMC code", y="Occurrence",
+subtitle = 'Fine Fuel Moisture Code'
+)
+
+
+
+par(mfrow=c(2, 1))
+    
+plot_grid(hist_of_wind_dist,hist_of_FFMC_dist)
+
+```
+# Obseration
+Fairly well distributed. No transformation neede.
+
+```{r Multi-Variable relationship, echo = FALSE, message=FALSE, warning=FALSE}
+scatterplotMatrix(~ logarea + wind + FFMC +temp ,  data = eda_sub_data,
+                  diagonal = FALSE,             # Remove kernel density estimates
+                  regLine = list(col = "green", # Linear regression line color
+                                 lwd = 3),      # Linear regression line width
+                  smooth = list(col.smooth = "red",   # Non-parametric mean color
+                                col.spread = "blue")) # Non-parametric variance color
+
+```
+# Building model model_SAV_long on data without area = 0
+
+```{r model Building: model_SAV_long }
+model_SAV_long <- lm(logarea ~ rain_binary + FFMC + wind , data = eda_sub_data)
+coeftest(model_SAV_long, vcov=vcovHAC)
+```
+
+# Building model model_SAV_long on data with area = 0
+
+```{r model Building: model_SAV_long }
+model_SAV_long <- lm(logarea ~ rain_binary + FFMC + wind , data = eda_data)
+coeftest(model_SAV_long, vcov=vcovHAC)
+```
+# Building model model_SAV_long on data with area = 0 with temp as a predictor variable
+
+```{r model Building: model_SAV_long }
+model_SAV_long <- lm(logarea ~ rain_binary + FFMC + wind + temp, data = eda_data)
+coeftest(model_SAV_long, vcov=vcovHAC)
+```
+# Building model model1 on data without area = 0
+```{r model building : model1}
+model1 <- lm(log(area+1) ~ wind + rain_binary + temp + FFMC + log(DMC) + DC, data = eda_sub_data)
+coeftest(model1, vcov = vcovHC)
+```
+
+
+
+
+# Building model model1 on data with area = 0
+```{r model building : model1}
+model1 <- lm(log(area+1) ~ wind + rain_binary + temp + FFMC + log(DMC) + DC, data = eda_data)
+coeftest(model1, vcov = vcovHC)
+```
+
+```{r model building: model2}
+
+model2 <- lm(log(area+1) ~ wind + rain_binary + temp + FFMC + log(DMC) + DC + RH, data = eda_data)
+
+coeftest(model2, vcov = vcovHC)
+```
+
+
+
+```{r model building: model3}
+model3 <- lm(log(area+1) ~ wind + rain_binary + temp + RH, data = eda_data)
+coeftest(model3, vcov = vcovHC)
+```
+
+
+```{r Plotting the model}
+set.seed(5600)
+shapiro.test(sample(model_SAV_long$residuals, size = 5000,replace=TRUE))
+plot(model1)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
