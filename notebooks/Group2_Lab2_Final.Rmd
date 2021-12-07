@@ -54,21 +54,21 @@ training = fire_data[-picked,]
 fire
 training
 
-fire <- fire %>%
-  mutate(
-    rain_binary = case_when(
-      rain > 0 ~ 1,
-      rain == 0 ~ 0,
-      )
-  )
-
-training <- training %>%
-  mutate(
-    rain_binary = case_when(
-      rain > 0 ~ 1,
-      rain == 0 ~ 0,
-      )
-  )
+# fire <- fire %>%
+#   mutate(
+#     rain_binary = case_when(
+#       rain > 0 ~ 1,
+#       rain == 0 ~ 0,
+#       )
+#   )
+# 
+# training <- training %>%
+#   mutate(
+#     rain_binary = case_when(
+#       rain > 0 ~ 1,
+#       rain == 0 ~ 0,
+#       )
+#   )
 
 
 ```
@@ -99,14 +99,10 @@ range(training$DC)
 # subset(training, area < 5)
 
 hist(training$wind)
-hist(fire_data$rain)
 hist(training$temp)
-hist(fire$temp)
 hist(training$FFMC)
-hist(fire$FFMC)
 hist(training$DMC)
 hist(training$DC)
-hist(fire$DC)
 hist(training$area)
 hist(training$RH)
 
@@ -313,7 +309,7 @@ Your goal is to choose models that encircle the space of reasonable modeling cho
 
 ```{r model building}
 
-model1 <- lm(log(area+1) ~ wind + rain_binary + temp + FFMC + log(DMC) + DC, data = fire)
+model1 <- lm(log(area+1) ~ wind + rain_binary + FFMC + BUI, data = fire)
 
 model2 <- lm(log(area+1) ~ wind + rain_binary + temp + FFMC + log(DMC) + DC + RH, data = fire)
 
