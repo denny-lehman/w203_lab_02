@@ -29,6 +29,7 @@ library(ggplot2)
 ```{r load data, echo = TRUE, message=FALSE, warning=FALSE}
 fire_raw <- read_csv(file = '../src/data/forestfires.csv')
 
+
 # add BUI variable
 BUI_less <- 0.8*((fire_raw$DMC*fire_raw$DC)/(fire_raw$DMC+(0.4*fire_raw$DC)))
 BUI_great <- fire_raw$DMC-(1-((0.8*fire_raw$DC)/(fire_raw$DMC+0.4*fire_raw$DC)))*(0.92+(0.0114*fire_raw$DMC)^1.7)
@@ -46,6 +47,10 @@ fire_data <- fire_raw %>%
 fire_data <- fire_data %>%
   dplyr::select(wind, rain, temp, RH, FFMC, BUI, area)
 
+```
+
+```{r EDA -get a summary of the entire dataset}
+summary(fire_raw)
 ```
 
 ```{r split data into EDA and Prod datasets}
@@ -66,9 +71,10 @@ EDA = fire_data[-picked,]
 describe(EDA)
 ```
 
-```{r EDA: Glimpse into the histograms for numerical variables of interest, echo = FALSE, message=FALSE, warning=FALSE, show_col_types = FALSE }
-# EDA: Glimpse into the histograms for numerical variables of interest
-hist_plots <- plot_num(EDA)
+```{r EDA: Glimpse into the histograms for numerical variables of interest, echo = FALSE }
+#plot_num(EDA)
+knitr::include_graphics("images/000005.png")
+
 ```
 
 # Analysis of Outcome Variable : area
@@ -76,11 +82,11 @@ hist_plots <- plot_num(EDA)
 Area is very important for our study because it is our outcome variable. We want to find out what factors cause area to burn in forest fires.
 From the graph above, area seems to have a heavy left tail. We should use log transformation on area field to see if it helps improve a linear relationship with our predictor variables.
 
-```{r EDA: Observations with area = 0,  echo = FALSE, message=FALSE, warning=FALSE, show_col_types = FALSE }
+```{r EDA  Observations with area equal to 0,  echo = FALSE, message=FALSE, warning=FALSE, show_col_types = FALSE }
 cat ("Total observations in the dataset: ", nrow(EDA))
 cat("\nNumber of Observations where area is zero:" ,nrow(subset(EDA,area == 0)))
 ```
-```{r EDA: Plot the histogram of the Distribution of Burnt Area,  echo = FALSE, message=FALSE, warning=FALSE, show_col_types = FALSE }
+```{r EDA - Plot the histogram of the Distribution of Burnt Area,  echo = FALSE, message=FALSE, warning=FALSE, show_col_types = FALSE }
 # Histogram of Non Log Transformed area
 hist_of_area_dist <- EDA %>% 
 ggplot() + aes(x = area) +
@@ -111,7 +117,7 @@ plot_grid(hist_of_area_dist,hist_of_logarea_dist)
 ```
 
 # Observation:
-The graphs above has a very heavy left tail and log transformation helped improve the distribution to look more normal. However, it is still skewed right. 
+The graphs above has a very heavy right tail and log transformation helped improve the distribution to look more normal. However, it is still skewed right. 
 
 #  Analyzing of Linear Relationship of Predictors Variables with Outcome
 
@@ -121,7 +127,7 @@ In our causal diagram we have identified four predictor variables
 3. FFMC - FFMC index from the FWI system: 18.7 to 96.20
 4. BUI - potential heat release in heavier fuels (total amount of fuel available for combustion): 0.0 to infinity
 
-```{r plotting predictors vs log transformed outcome variable}
+```{r plotting predictors vs log transformed outcome variable, , echo = TRUE, message=FALSE, warning=FALSE}
 a <- ggplot(EDA, aes(x = wind, y = log(area+1))) +
   geom_point() +
   geom_smooth() +
@@ -147,7 +153,7 @@ grid.arrange(a, b, c, d, nrow = 2)
 # Observation:
 Rain and BUI variables have room for improvement. Will try log transforms to see if it helps improve linearity.
 
-```{r plotting log trasnformed rain and BUI predictors vs outcome variable}
+```{r plotting log trasnformed rain and BUI predictors vs outcome variable,echo = TRUE, message=FALSE, warning=FALSE}
 a <- ggplot(EDA, aes(x = rain, y = log(area+1))) +
   geom_point() +
   geom_smooth() +
@@ -175,7 +181,7 @@ rain predictor did not benefit from a log transform. However, log(BUI) seems to 
 
 # Analysis of rain
 
-```{r last resort in fixing rain variable}
+```{r last resort in fixing rain variable, , echo = TRUE, message=FALSE, warning=FALSE}
 
 # all transformations failed to improve the plot of rain and log(area+1)/
 # so, we will convert our rain variable to binary, is not raining (0) or is raining (1).
@@ -200,56 +206,60 @@ EDA <- EDA %>%
 
 # Observation: wind and FFMC 
 
-```{r EDA: Check the distribution of column wind }
+```{r EDA - Check the distribution of column wind , echo = TRUE, message=FALSE, warning=FALSE}
 hist_of_wind_dist <- EDA %>% 
 ggplot() + aes(x = wind ) +
 geom_histogram( bins=20, fill="#C8E6C9", color="black", alpha=0.9) +
 labs(
 x = "wind speed in km/h", y="Occurrence",
-title = 'Distribution graphs',
-subtitle = 'Wind occurrence'
+subtitle = 'Wind occurrence',
+caption = "Figure 5"
 )
 
+
+hist_of_BUI_dist <- EDA %>% 
+ggplot() + aes(x = log(BUI) ) +
+geom_histogram( bins=20, fill="#D1C4E9", color="black", alpha=0.9) +
+labs(
+x = "log(BUI)", y="Occurrence",
+subtitle = 'log of Build Up Index',
+caption = "Figure 6"
+)
 hist_of_FFMC_dist <- EDA %>% 
-ggplot() + aes(x = log(FFMC) ) +
+ggplot() + aes(x = FFMC ) +
 geom_histogram( bins=20, fill="#FFCCBC", color="black", alpha=0.9) +
 labs(
 x = "FFMC code", y="Occurrence",
-subtitle = 'Fine Fuel Moisture Code'
+subtitle = 'Fine Fuel Moisture Code',
+caption = "Figure 3"
 )
-
-
-
-par(mfrow=c(2, 1))
+hist_of_logFFMC_dist <- EDA %>% 
+ggplot() + aes(x = log(FFMC) ) +
+geom_histogram( bins=20, fill="#FFCCBC", color="black", alpha=0.9) +
+labs(
+x = "log(FFMC code)", y="Occurrence",
+subtitle = 'log of Fine Fuel Moisture Code',
+caption = "Figure 4"
+)
+par(mfrow=c(2, 2))
     
-plot_grid(hist_of_wind_dist,hist_of_FFMC_dist)
+plot_grid(hist_of_FFMC_dist, hist_of_logFFMC_dist, hist_of_wind_dist, hist_of_BUI_dist)
 
 ```
-# Obseration
-Fairly well distributed. No transformation needed.
 
-```{r Multi-Variable relationship, echo = FALSE, message=FALSE, warning=FALSE}
-scatterplotMatrix(~ log(area+1) + wind + FFMC +log(BUI),  data = EDA,
-                  diagonal = FALSE,             # Remove kernel density estimates
-                  regLine = list(col = "green", # Linear regression line color
-                                 lwd = 3),      # Linear regression line width
-                  smooth = list(col.smooth = "red",   # Non-parametric mean color
-                                col.spread = "blue")) # Non-parametric variance color
-
-```
 
 # Building Our Linear Models 
 ```{r model Building: }
 # our primary model used to answer our Research Question
-model1 <- lm(log(area+1) ~ wind, data = Prod)
+model1 <- lm(log(area+1) ~ log(BUI) , data = Prod)
 coeftest(model1, vcov=vcovHAC)
 
 # a model that uses all available variables
-model2 <- lm(log(area+1) ~ wind + rain_binary, data = Prod)
+model2 <- lm(log(area+1) ~ log(BUI) + wind + rain_binary + FFMC, data = Prod)
 coeftest(model2, vcov=vcovHAC)
 
 # a model that uses only the direct atmospheric metrics
-model3 <- lm(log(area+1) ~ wind + rain_binary + FFMC + log(BUI), data = Prod)
+model3 <- lm(log(area+1) ~ wind , data = Prod)
 coeftest(model3, vcov=vcovHAC)
 
 ```
@@ -269,3 +279,5 @@ stargazer(
 ```{r Plotting the model}
 anova(model1, model2, model3, test="F")
 ```
+
+
