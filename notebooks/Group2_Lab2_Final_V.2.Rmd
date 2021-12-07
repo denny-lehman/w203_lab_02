@@ -229,7 +229,7 @@ plot_grid(hist_of_wind_dist,hist_of_FFMC_dist)
 Fairly well distributed. No transformation needed.
 
 ```{r Multi-Variable relationship, echo = FALSE, message=FALSE, warning=FALSE}
-scatterplotMatrix(~ logarea + wind + FFMC ,  data = EDA,
+scatterplotMatrix(~ log(area+1) + wind + FFMC +log(BUI),  data = EDA,
                   diagonal = FALSE,             # Remove kernel density estimates
                   regLine = list(col = "green", # Linear regression line color
                                  lwd = 3),      # Linear regression line width
@@ -241,15 +241,15 @@ scatterplotMatrix(~ logarea + wind + FFMC ,  data = EDA,
 # Building Our Linear Models 
 ```{r model Building: }
 # our primary model used to answer our Research Question
-model1 <- lm(log(area+1) ~ wind + rain_binary + FFMC + log(BUI), data = Prod)
+model1 <- lm(log(area+1) ~ wind, data = Prod)
 coeftest(model1, vcov=vcovHAC)
 
 # a model that uses all available variables
-model2 <- lm(log(area+1) ~ wind + rain_binary + FFMC + log(BUI) + RH + temp, data = Prod)
+model2 <- lm(log(area+1) ~ wind + rain_binary, data = Prod)
 coeftest(model2, vcov=vcovHAC)
 
 # a model that uses only the direct atmospheric metrics
-model3 <- lm(log(area+1) ~ wind + rain_binary + RH + temp, data = Prod)
+model3 <- lm(log(area+1) ~ wind + rain_binary + FFMC + log(BUI), data = Prod)
 coeftest(model3, vcov=vcovHAC)
 
 ```
@@ -264,4 +264,8 @@ stargazer(
   type = 'text', header = FALSE,
   star.cutoffs = c(0.05, 0.01, 0.001) # the default isn't in line with w203
 )
+```
+
+```{r Plotting the model}
+anova(model1, model2, model3, test="F")
 ```
