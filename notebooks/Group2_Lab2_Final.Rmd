@@ -39,6 +39,11 @@ How might we predict the size of a forest fire based on wind, rain, flammability
 fire_data <- read_csv(file = '../src/data/forestfires.csv')
 ```
 
+
+# Split the data into training and testing sets
+We split the data into train-test subset to estimate the performance of our model because we had a decent size  dataset.
+We kept 30% data for the training set and 70% for the test/validation data set.
+
 ```{r}
 sample_size = floor(0.7*nrow(fire_data))
 set.seed(777)
